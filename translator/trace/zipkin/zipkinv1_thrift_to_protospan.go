@@ -1,4 +1,4 @@
-// Copyright 2019, OpenCensus Authors
+// Copyright 2019, OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ func zipkinV1ThriftToOCSpan(zSpan *zipkincore.Span) (*tracepb.Span, *annotationP
 	}
 
 	parsedAnnotations := parseZipkinV1ThriftAnnotations(zSpan.Annotations)
-	attributes, localComponent := zipkinV1ThriftBinAnnotationsToOCAttributes(zSpan.BinaryAnnotations)
+	attributes, ocStatus, localComponent := zipkinV1ThriftBinAnnotationsToOCAttributes(zSpan.BinaryAnnotations)
 	if parsedAnnotations.Endpoint.ServiceName == unknownServiceName && localComponent != "" {
 		parsedAnnotations.Endpoint.ServiceName = localComponent
 	}
@@ -90,6 +90,7 @@ func zipkinV1ThriftToOCSpan(zSpan *zipkincore.Span) (*tracepb.Span, *annotationP
 		TraceId:      traceID,
 		SpanId:       spanID,
 		ParentSpanId: parentID,
+		Status:       ocStatus,
 		Kind:         parsedAnnotations.Kind,
 		TimeEvents:   parsedAnnotations.TimeEvents,
 		StartTime:    startTime,
@@ -139,11 +140,12 @@ func toTranslatorEndpoint(e *zipkincore.Endpoint) *endpoint {
 
 var trueByteSlice = []byte{1}
 
-func zipkinV1ThriftBinAnnotationsToOCAttributes(ztBinAnnotations []*zipkincore.BinaryAnnotation) (attributes *tracepb.Span_Attributes, fallbackServiceName string) {
+func zipkinV1ThriftBinAnnotationsToOCAttributes(ztBinAnnotations []*zipkincore.BinaryAnnotation) (attributes *tracepb.Span_Attributes, status *tracepb.Status, fallbackServiceName string) {
 	if len(ztBinAnnotations) == 0 {
-		return nil, ""
+		return nil, nil, ""
 	}
 
+	sMapper := &statusMapper{}
 	var localComponent string
 	attributeMap := make(map[string]*tracepb.AttributeValue)
 	for _, binaryAnnotation := range ztBinAnnotations {
@@ -199,7 +201,17 @@ func zipkinV1ThriftBinAnnotationsToOCAttributes(ztBinAnnotations []*zipkincore.B
 			localComponent = string(binaryAnnotation.Value)
 		}
 
+		if drop := sMapper.fromAttribute(key, pbAttrib); drop {
+			continue
+		}
+
 		attributeMap[key] = pbAttrib
+	}
+
+	status = sMapper.ocStatus()
+
+	if len(attributeMap) == 0 {
+		return nil, status, ""
 	}
 
 	if fallbackServiceName == "" {
@@ -209,7 +221,7 @@ func zipkinV1ThriftBinAnnotationsToOCAttributes(ztBinAnnotations []*zipkincore.B
 	attributes = &tracepb.Span_Attributes{
 		AttributeMap: attributeMap,
 	}
-	return attributes, fallbackServiceName
+	return attributes, status, fallbackServiceName
 }
 
 var errNotEnoughBytes = errors.New("not enough bytes representing the number")

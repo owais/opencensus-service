@@ -1,4 +1,4 @@
-// Copyright 2019, OpenCensus Authors
+// Copyright 2019, OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -387,12 +387,25 @@ func appendJaegerTagFromOCStatusProto(jTags []jaeger.KeyValue, ocStatus *tracepb
 		return jTags
 	}
 
-	jTag := jaeger.KeyValue{
-		Key:    "span.status",
-		VInt64: int64(ocStatus.Code),
-		VStr:   ocStatus.Message,
+	for _, jt := range jTags {
+		if jt.Key == "status.code" || jt.Key == "status.message" {
+			return jTags
+		}
 	}
-	jTags = append(jTags, jTag)
+
+	jTags = append(jTags, jaeger.KeyValue{
+		Key:    tracetranslator.TagStatusCode,
+		VInt64: int64(ocStatus.Code),
+		VType:  jaeger.ValueType_INT64,
+	})
+
+	if ocStatus.Message != "" {
+		jTags = append(jTags, jaeger.KeyValue{
+			Key:   tracetranslator.TagStatusMsg,
+			VStr:  ocStatus.Message,
+			VType: jaeger.ValueType_STRING,
+		})
+	}
 
 	return jTags
 }

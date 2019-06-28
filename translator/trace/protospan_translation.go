@@ -1,4 +1,4 @@
-// Copyright 2018, OpenCensus Authors
+// Copyright 2018, OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,4 +22,11 @@ const (
 	MessageEventTypeKey             = "message.type"
 	MessageEventCompressedSizeKey   = "message.compressed_size"
 	MessageEventUncompressedSizeKey = "message.uncompressed_size"
+
+	TagStatusCode       = "status.code"
+	TagStatusMsg        = "status.message"
+	TagHTTPStatusCode   = "http.status_code"
+	TagHTTPStatusMsg    = "http.status_message"
+	TagZipkinCensusCode = "census.status_code"
+	TagZipkinCensusMsg  = "census.status_description"
 )
